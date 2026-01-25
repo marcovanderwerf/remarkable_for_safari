@@ -17,55 +17,35 @@ A Safari Web Extension that lets you send web articles, news, and other content 
 
 - macOS 11.0 (Big Sur) or later
 - Safari 14 or later
-- Xcode 13 or later (for building from source)
+- Xcode (free from App Store) - needed to build Safari extensions
 - A reMarkable account
 
-### Building from Source
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/remarkable_for_safari.git
-   cd remarkable_for_safari
-   ```
-
-2. **Create the Xcode project**
-
-   Open Xcode and create a new Safari Web Extension project:
-   - File → New → Project
-   - Choose "Safari Extension App" template
-   - Name it "reMarkable for Safari"
-   - Select a location and create
-
-3. **Copy the extension files**
-
-   Replace the generated extension files with the ones from this repository:
-   ```bash
-   # Copy web extension files to Resources folder
-   cp -r extension/* "path/to/your/xcode/project/reMarkable for Safari Extension/Resources/"
-   ```
-
-4. **Configure the project**
-   - Open the Xcode project
-   - Select the extension target
-   - Ensure the manifest.json is included in the "Copy Bundle Resources" build phase
-   - Set your development team for code signing
-
-5. **Build and Run**
-   - Select the main app scheme
-   - Build and run (⌘R)
-   - This will install the extension and open the host app
-
-6. **Enable in Safari**
-   - Open Safari → Preferences → Extensions
-   - Enable "reMarkable for Safari"
-
-### Alternative: Using the Project Generator Script
+### Quick Install (Terminal)
 
 ```bash
-./scripts/create-xcode-project.sh
+# 1. Clone the repository
+git clone https://github.com/yourusername/remarkable_for_safari.git
+cd remarkable_for_safari
+
+# 2. Run the build script
+./build.sh
 ```
 
-This script will set up the Xcode project structure automatically.
+The script will:
+- Convert the extension to Safari format automatically
+- Create an Xcode project
+- Ask if you want to open it
+
+Then in Xcode:
+1. Set your Team (click project → Signing & Capabilities → Team)
+2. Press **⌘R** to build and run
+3. Enable in **Safari → Settings → Extensions**
+
+That's it!
+
+### Manual Installation
+
+If you prefer to set things up manually, see the [detailed instructions](#manual-setup) below.
 
 ## Usage
 
