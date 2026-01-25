@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "reMarkable for Safari",
+  "version": "1.0.0",
+  "description": "Send web articles and pages to your reMarkable tablet with one click",
+  "icons": {
+    "48": "images/icon-48.png",
+    "96": "images/icon-96.png",
+    "128": "images/icon-128.png",
+    "256": "images/icon-256.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "images/icon-48.png",
+      "32": "images/icon-48.png",
+      "48": "images/icon-48.png",
+      "128": "images/icon-128.png"
+    }
+  },
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://webapp-production-dot-remarkable-production.appspot.com/*",
+    "https://my.remarkable.com/*",
+    "https://document-storage-production-dot-remarkable-production.appspot.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/readability.js", "content/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["images/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

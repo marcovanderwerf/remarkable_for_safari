@@ -1,0 +1,22 @@
+{
+  "name": "remarkable-for-safari",
+  "version": "1.0.0",
+  "description": "Safari Web Extension to send web articles to your reMarkable tablet",
+  "main": "src/background.js",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "dev": "node scripts/build.js --watch",
+    "package": "node scripts/package.js"
+  },
+  "keywords": [
+    "remarkable",
+    "safari",
+    "extension",
+    "web-clipper",
+    "e-reader"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {},
+  "dependencies": {}
+}
