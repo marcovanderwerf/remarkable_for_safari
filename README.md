@@ -23,11 +23,8 @@ A Safari Web Extension that lets you send web articles, news, and other content 
 ### Quick Install (Terminal)
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/yourusername/remarkable_for_safari.git
+git clone https://github.com/marcovanderwerf/remarkable_for_safari.git
 cd remarkable_for_safari
-
-# 2. Run the build script
 ./build.sh
 ```
 
