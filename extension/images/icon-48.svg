@@ -1,6 +1,5 @@
 <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="48" height="48" rx="8" fill="#000"/>
-  <path d="M12 12h24v4H12V12z" fill="#fff"/>
-  <path d="M12 20h24v4H12v-4z" fill="#fff"/>
-  <path d="M12 28h16v4H12v-4z" fill="#fff"/>
+  <rect width="48" height="48" rx="8" fill="#292929"/>
+  <text x="6" y="35" font-family="Georgia, 'Times New Roman', serif" font-size="26" font-style="italic" fill="#ffffff">r</text>
+  <text x="19" y="35" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="600" fill="#ffffff">M</text>
 </svg>
