@@ -1,0 +1,130 @@
+/* PDF stylesheet tuned for reMarkable e-ink (RM2 / Paper Pro).
+   Tablet rendered area is ~157×210mm at 226dpi. We render at A5-ish
+   page size with generous margins so text reads at a comfortable
+   ~14pt without zooming. */
+
+@page {
+  size: 157mm 210mm;
+  margin: 14mm 12mm 16mm 12mm;
+}
+
+html, body {
+  font-family: "Iowan Old Style", "Charter", "Georgia", serif;
+  font-size: 10pt;
+  line-height: 1.5;
+  color: #000;
+  background: #fff;
+}
+
+header .post-title {
+  font-size: 19pt;
+  line-height: 1.2;
+  margin: 0 0 5pt 0;
+  font-weight: 700;
+}
+
+header .post-date {
+  font-style: italic;
+  color: #333;
+  margin: 0 0 16pt 0;
+  font-size: 9pt;
+}
+
+article h1, article h2, article h3, article h4 {
+  font-family: "Helvetica Neue", "Arial", sans-serif;
+  font-weight: 700;
+  page-break-after: avoid;
+  line-height: 1.25;
+}
+
+article h1 { font-size: 15pt; margin: 20pt 0 7pt; }
+article h2 { font-size: 12.5pt; margin: 16pt 0 5pt; }
+article h3 { font-size: 11pt; margin: 12pt 0 4pt; }
+
+article p {
+  margin: 0 0 10pt 0;
+  text-align: justify;
+  hyphens: auto;
+  orphans: 3;
+  widows: 3;
+}
+
+article a { color: #000; text-decoration: underline; }
+
+article blockquote {
+  margin: 10pt 0 10pt 8pt;
+  padding-left: 10pt;
+  border-left: 2pt solid #000;
+  font-style: italic;
+}
+
+article ul, article ol { margin: 0 0 10pt 18pt; padding: 0; }
+article li { margin-bottom: 4pt; }
+
+/* Charts / illustrations — almost full-width, capped at ~half page height.
+   (Page is 210mm tall; 110mm = ~52%. 95% width so wide-short charts read
+    at a comfortable size rather than shrinking to thumbnails.) */
+article img, article figure, article picture {
+  display: block;
+  max-width: 95%;
+  max-height: 110mm;
+  height: auto;
+  margin: 10pt auto;
+  page-break-inside: avoid;
+  position: static !important;     /* defend against publisher CSS overlays */
+  transform: none !important;
+  float: none !important;
+}
+
+/* Nuclear: nuke ALL positioning + transforms anywhere in the article.
+   FT (and HTSI) sometimes place caption text as siblings of the figure with
+   absolute positioning, so a figure-descendant rule isn't enough. We're
+   rendering to a fixed-page PDF — there is no legitimate use case for
+   absolute positioning in our output. */
+article, article * {
+  position: static !important;
+  transform: none !important;
+  float: none !important;
+  top: auto !important; left: auto !important;
+  right: auto !important; bottom: auto !important;
+  z-index: auto !important;
+}
+article figcaption,
+article p.caption {
+  display: block !important;
+  clear: both !important;
+  margin: 4pt auto 12pt auto;
+  font-size: 9pt;
+  font-style: italic;
+  text-align: center;
+  color: #444;
+}
+
+article figcaption {
+  font-size: 10pt;
+  font-style: italic;
+  text-align: center;
+  margin-top: 4pt;
+  position: static !important;     /* FT HTSI puts these on top of the image */
+  transform: none !important;
+  left: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  right: auto !important;
+}
+
+/* Substack often wraps embeds in divs with inline styles — neutralize. */
+div, section { background: transparent !important; color: inherit !important; }
+
+/* Tables: simple, readable. */
+table { border-collapse: collapse; width: 100%; margin: 10pt 0; font-size: 10.5pt; }
+th, td { border: 0.5pt solid #000; padding: 4pt 6pt; text-align: left; }
+th { background: #eee; font-weight: 700; }
+
+/* Code blocks aren't typical in Prof G posts, but render cleanly if present. */
+pre, code {
+  font-family: "Menlo", "Monaco", monospace;
+  font-size: 10pt;
+  background: #f4f4f4;
+}
+pre { padding: 6pt; page-break-inside: avoid; }
