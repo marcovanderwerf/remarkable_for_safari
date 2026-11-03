@@ -128,3 +128,19 @@ pre, code {
   background: #f4f4f4;
 }
 pre { padding: 6pt; page-break-inside: avoid; }
+
+/* Rich header: standfirst + byline + lead photo (email pipeline). */
+header .standfirst {
+  font-size: 11.5pt;
+  line-height: 1.4;
+  color: #222;
+  margin: 0 0 7pt 0;
+}
+header img.lead {
+  display: block;
+  max-width: 100%;
+  max-height: 95mm;
+  margin: 0 auto 14pt;
+}
+
+article p.caption { break-before: avoid; page-break-before: avoid; }

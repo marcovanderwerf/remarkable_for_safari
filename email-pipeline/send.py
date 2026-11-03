@@ -52,9 +52,23 @@ def from_url(url: str) -> tuple[str, str]:
     if not downloaded:
         # Fallback to requests (some sites block trafilatura's fetcher).
         r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+        if "charset" not in r.headers.get("Content-Type", ""):
+            r.encoding = r.apparent_encoding   # avoid â€“ style mojibake
         downloaded = r.text if r.ok else None
     if not downloaded:
         sys.exit(f"Could not fetch {url}")
+    # Captions: trafilatura drops <figcaption>, so turn each into a marked
+    # paragraph right after its image, and restore the caption class after.
+    pre = BeautifulSoup(downloaded, "html.parser")
+    for cap in pre.find_all("figcaption"):
+        txt = cap.get_text(" ", strip=True)
+        fig = cap.find_parent("figure")
+        if txt and fig:
+            para = pre.new_tag("p"); para.string = CAP_MARK + txt
+            fig.insert_after(para)
+        cap.decompose()
+    page_html = downloaded
+    downloaded = str(pre)
     # Extract main content as HTML, keeping images + formatting.
     extracted = trafilatura.extract(
         downloaded, output_format="html",
@@ -62,15 +76,59 @@ def from_url(url: str) -> tuple[str, str]:
         include_comments=False, include_tables=True,
         favor_precision=True,
     )
-    # Title from metadata.
-    md = trafilatura.extract_metadata(downloaded)
+    # Title + byline metadata.
+    md = trafilatura.extract_metadata(page_html)
     title = (md.title if md and md.title else None) or url
+    META.update(page_meta(page_html, md, url))
+    if extracted:
+        post = BeautifulSoup(extracted, "html.parser")
+        for para in post.find_all("p"):
+            t = para.get_text()
+            if t.startswith(CAP_MARK):
+                para.string = t[len(CAP_MARK):]
+                para["class"] = "caption"
+        extracted = str(post)
     if not extracted:
         # Last resort: dump readable text from <article>/<main>.
         soup = BeautifulSoup(downloaded, "html.parser")
         node = soup.select_one("article") or soup.select_one("main") or soup
         extracted = str(node)
     return title, extracted
+
+
+META: dict = {}
+CAP_MARK = "⁣CAPTION⁣ "
+
+
+def page_meta(html: str, md, url: str) -> dict:
+    """Author, publication, date, standfirst and lead image for the header."""
+    soup = BeautifulSoup(html, "html.parser")
+
+    def og(*names):
+        for n in names:
+            t = (soup.find("meta", property=n) or soup.find("meta", attrs={"name": n}))
+            if t and t.get("content"):
+                return t["content"].strip()
+        return None
+
+    date = None
+    raw = (md.date if md and md.date else None) or og("article:published_time")
+    if raw:
+        try:
+            date = dt.datetime.fromisoformat(raw[:10]).strftime("%B %-d, %Y")
+        except ValueError:
+            date = raw
+    site = (md.sitename if md and md.sitename else None) or og("og:site_name") \
+        or urlparse(url).netloc.removeprefix("www.")
+    return {
+        "author": (md.author if md and md.author else None) or og("author", "article:author"),
+        "site": site,
+        "date": date,
+        "standfirst": (md.description if md and md.description else None)
+                      or og("og:description", "description"),
+        "image": og("og:image", "twitter:image"),
+        "url": url,
+    }
 
 
 def from_markdown(text: str) -> str:
@@ -105,6 +163,19 @@ def clean(html: str) -> str:
     for el in soup.find_all(True):
         if el.has_attr("style"):
             del el["style"]
+    # Lazy-loaded images: promote data-src / srcset to a real src.
+    for img in soup.find_all("img"):
+        src = img.get("src", "")
+        lazy = img.get("data-src") or img.get("data-original") or img.get("data-lazy-src")
+        if lazy and (not src or src.startswith("data:")):
+            img["src"] = lazy
+        elif (not src or src.startswith("data:")) and (img.get("srcset") or img.get("data-srcset")):
+            cands = (img.get("srcset") or img.get("data-srcset")).split(",")
+            img["src"] = cands[-1].strip().split(" ")[0]   # largest
+        for a in ("srcset", "sizes", "loading", "width", "height"):
+            img.attrs.pop(a, None)
+        if not img.get("src") or img["src"].startswith("data:"):
+            img.decompose()
     # Flatten <figure> → <img> + <p class="caption"> so captions never
     # interleave with body text (lesson learned from the FT pipeline).
     for fig in soup.find_all("figure"):
@@ -128,19 +199,60 @@ def clean(html: str) -> str:
     return str(soup)
 
 
+def drop_repeated_title(body_html: str, title: str) -> str:
+    """Remove a leading heading that just repeats the title (it's in the header)."""
+    soup = BeautifulSoup(body_html, "html.parser")
+    h = soup.find(["h1", "h2"])
+    norm = lambda t: re.sub(r"\W+", " ", t).strip().lower()
+    if h and norm(h.get_text()) == norm(title) and not h.find_previous("p"):
+        h.decompose()
+    return str(soup)
+
+
 def render_pdf(title: str, body_html: str, out: Path) -> None:
-    date = dt.datetime.now().strftime("%B %-d, %Y")
+    from html import escape
+    m = META
+    date = m.get("date") or dt.datetime.now().strftime("%B %-d, %Y")
+    byline = " · ".join(x for x in (m.get("author"), m.get("site"), date) if x)
+    head = f'<h1 class="post-title">{escape(title)}</h1>'
+    sf = m.get("standfirst")
+    body_text = BeautifulSoup(body_html, "html.parser").get_text(" ", strip=True)
+    if sf and sf[:60] not in body_text:          # skip if it's just the first paragraph
+        head += f'<p class="standfirst">{escape(sf)}</p>'
+    head += f'<p class="post-date">{escape(byline)}</p>'
+    # Lead photo: only if the body doesn't already open with an image.
+    first = BeautifulSoup(body_html, "html.parser").find(["img", "p"])
+    if m.get("image") and not (first and first.name == "img"):
+        head += f'<img class="lead" src="{escape(m["image"])}">'
     full = f"""<!doctype html><html><head><meta charset="utf-8">
-<title>{title}</title></head><body>
-<header><h1 class="post-title">{title}</h1>
-<p class="post-date">{date}</p></header>
+<title>{escape(title)}</title></head><body>
+<header>{head}</header>
 <article>{body_html}</article></body></html>"""
     css = [CSS(filename=str(STYLE_CSS))] if STYLE_CSS.exists() else []
 
-    def fetcher(url):
+    def get(url):
+        if url.startswith("//"):
+            url = "https:" + url
         r = requests.get(url, timeout=20, headers={"User-Agent": UA})
-        return {"mime_type": r.headers.get("Content-Type", "").split(";")[0],
-                "string": r.content}
+        r.raise_for_status()
+        return url, r
+
+    try:  # WeasyPrint >= 68: fetchers are URLFetcher objects
+        from weasyprint.urls import URLFetcher, URLFetcherResponse
+
+        class Fetcher(URLFetcher):
+            def fetch(self, url, headers=None):
+                if not url.startswith(("http:", "https:", "//")):
+                    return super().fetch(url, headers)   # data:, file:
+                url, r = get(url)
+                return URLFetcherResponse(url, r.content, dict(r.headers), r.status_code)
+
+        fetcher = Fetcher()
+    except ImportError:  # older WeasyPrint (the Mac pipelines): dict fetchers
+        def fetcher(url):
+            url, r = get(url)
+            return {"mime_type": r.headers.get("Content-Type", "").split(";")[0],
+                    "string": r.content}
 
     HTML(string=full, base_url="", url_fetcher=fetcher).write_pdf(
         str(out), stylesheets=css)
@@ -196,6 +308,7 @@ def main() -> int:
         title = args.title
 
     body = clean(body)
+    body = drop_repeated_title(body, title)
     with tempfile.TemporaryDirectory() as td:
         fname = f"{slugify(title)}.pdf"
         out = Path(td) / fname
