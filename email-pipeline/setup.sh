@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prepare a fresh cloud session: Python deps + rmapi logged in from a secret.
 set -e
-pip install -q weasyprint trafilatura beautifulsoup4 markdown requests 2>&1 \
+pip install -q weasyprint trafilatura beautifulsoup4 markdown requests pypdf 2>&1 \
   | grep -v "running pip as the 'root'" || true
 
 if ! command -v rmapi >/dev/null; then

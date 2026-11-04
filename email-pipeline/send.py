@@ -281,6 +281,60 @@ def upload(pdf: Path, folder: str) -> None:
         raise RuntimeError(f"rmapi upload failed: {r.stderr.strip()}")
 
 
+def pdf_title(data: bytes, page: dict, url: str) -> str:
+    """Best name for a PDF: the PDF's own Title, Safari's title, then the URL."""
+    def usable(t: str | None) -> bool:
+        return bool(t) and len(t.strip()) >= 3 and not re.search(
+            r"\.(pdf|docx?|cgi|php|aspx?)$|^untitled|^microsoft word", t.strip(), re.I)
+
+    try:
+        import io
+        from pypdf import PdfReader
+        t = (PdfReader(io.BytesIO(data)).metadata or {}).get("/Title")
+        if usable(t):
+            return str(t).strip()
+    except Exception:        # pypdf missing or PDF unreadable: try a plain scan
+        pass
+    m = re.search(rb"/Title\s*\(((?:[^()\\]|\\.){3,200})\)", data[:200_000])
+    if m:
+        t = m.group(1)
+        if t.startswith(b"\xfe\xff"):
+            t = t[2:].decode("utf-16-be", "ignore")
+        else:
+            t = t.decode("latin-1", "ignore")
+        t = re.sub(r"\\(.)", r"\1", t).strip()
+        if usable(t):
+            return t
+    t = (page.get("title") or "").strip()
+    if usable(t) and t != url:
+        return t
+    name = urlparse(url).path.rstrip("/").split("/")[-1]
+    if usable(name) or name.lower().endswith(".pdf"):
+        return re.sub(r"\.pdf$", "", name, flags=re.I)
+    return f"{urlparse(url).netloc.removeprefix('www.')} {dt.date.today():%Y-%m-%d}"
+
+
+def send_pdf_as_is(page: dict, args) -> int:
+    import base64
+    data = base64.b64decode(page["pdf"])
+    if not data.startswith(b"%PDF"):
+        sys.exit("Safari returned something that isn't a PDF "
+                 "(a login or 'checking your browser' page?). Open the PDF and try again.")
+    title = args.title or pdf_title(data, page, page.get("url", ""))
+    size_kb = len(data) // 1024
+    with tempfile.TemporaryDirectory() as td:
+        out = Path(td) / f"{slugify(title)}.pdf"
+        out.write_bytes(data)
+        if args.out:
+            Path(args.out).write_bytes(data)
+        if args.no_upload:
+            print(f"PDF '{title}' ({size_kb}KB){' → ' + args.out if args.out else ''}")
+            return 0
+        upload(out, args.folder)
+    print(f"✓ Sent PDF '{title}' ({size_kb}KB) → {args.folder}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("source", nargs="?", help="URL or path to .md/.html/.txt")
@@ -304,8 +358,13 @@ def main() -> int:
         import json
         raw = sys.stdin.read() if args.page_json == "-" else Path(args.page_json).read_text()
         page = json.loads(raw)
+        if page.get("error"):
+            sys.exit(f"Safari couldn't read the page: {page['error']}")
+        if page.get("pdf"):
+            # Safari was showing a PDF: send the file itself, untouched
+            return send_pdf_as_is(page, args)
         if not page.get("html") or not page.get("url"):
-            sys.exit("--page-json needs both \"url\" and \"html\"")
+            sys.exit("--page-json needs \"url\" and either \"html\" or \"pdf\"")
         title, body = from_page_html(page["html"], page["url"])
     elif args.stdin:
         text = sys.stdin.read()

@@ -22,7 +22,7 @@ the full text instead.
 
 1. Clone this repo (the build instructions use `~/Others/Coding/remarkable_for_safari`).
 2. Install the renderer's dependencies:
-   `python3 -m pip install weasyprint trafilatura beautifulsoup4 markdown requests`
+   `python3 -m pip install weasyprint trafilatura beautifulsoup4 markdown requests pypdf`
    (WeasyPrint also needs `brew install pango`).
 3. Install [rmapi](https://github.com/ddvk/rmapi) (ddvk fork) and log in once
    with `rmapi ls`. If your Mac pipelines already use rmapi, this is done.
@@ -46,8 +46,25 @@ In the Shortcuts app, create a new Shortcut named **Send to reMarkable**:
    **Use as Quick Action** (Services Menu). Set *Receive* to **Safari web pages**.
 2. Add **Run JavaScript on Web Page** with:
    ```js
-   completion(JSON.stringify({ url: location.href, html: document.documentElement.outerHTML }));
+   (async () => {
+     try {
+       if (document.contentType === 'application/pdf') {
+         // A PDF open in Safari: send the file itself (with Safari's cookies)
+         const r = await fetch(location.href, { credentials: 'include' });
+         const b = new Uint8Array(await r.arrayBuffer());
+         let s = '';
+         for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+         completion(JSON.stringify({ url: location.href, title: document.title, pdf: btoa(s) }));
+       } else {
+         completion(JSON.stringify({ url: location.href, html: document.documentElement.outerHTML }));
+       }
+     } catch (e) {
+       completion(JSON.stringify({ url: location.href, error: String(e) }));
+     }
+   })();
    ```
+   Web pages are rendered into the reMarkable PDF style. PDFs (papers,
+   reports) are sent as they are, like PDFs attached to an email.
 3. Add **Run Shell Script**:
    - Shell: `bash`, Input: *JavaScript result*, Pass Input: **to stdin**
    - Script: `~/Others/Coding/remarkable_for_safari/shortcuts/send-from-safari.sh`
