@@ -45,9 +45,55 @@ def slugify(title: str) -> str:
     return s[:90] or "article"
 
 
+def from_medium_feed(url: str) -> tuple[str, str] | None:
+    """Medium blocks scripted page loads, but its official RSS feed carries
+    the full text of free posts. Find the post in the author's (or
+    publication's) feed by its id."""
+    u = urlparse(url)
+    if not (u.netloc.endswith("medium.com")):
+        return None
+    post_id = u.path.rstrip("/").rsplit("-", 1)[-1]
+    first = u.path.strip("/").split("/")[0]
+    feeds = []
+    if first.startswith("@"):
+        feeds.append(f"https://medium.com/feed/{first}")
+    elif u.netloc != "medium.com":                       # user.medium.com
+        feeds.append(f"https://medium.com/feed/@{u.netloc.split('.')[0]}")
+    elif first:                                          # publication
+        feeds.append(f"https://medium.com/feed/{first}")
+    for feed in feeds:
+        r = requests.get(feed, headers={"User-Agent": UA}, timeout=30)
+        if not r.ok:
+            continue
+        soup = BeautifulSoup(r.content, "xml")
+        for item in soup.find_all("item"):
+            link = (item.link.text if item.link else "") + (item.guid.text if item.guid else "")
+            if post_id and post_id in link:
+                body = item.find("encoded").text
+                date = None
+                if item.pubDate:
+                    from email.utils import parsedate_to_datetime
+                    date = parsedate_to_datetime(item.pubDate.text).strftime("%B %-d, %Y")
+                META.update({"author": item.find("creator").text if item.find("creator") else None,
+                             "site": "Medium", "date": date, "url": url})
+                # Medium appends a tracking pixel and "was originally published" footer.
+                b = BeautifulSoup(body, "html.parser")
+                for img in b.find_all("img"):
+                    if "stat?event" in img.get("src", ""):
+                        img.decompose()
+                for para in b.find_all("p"):
+                    if "was originally published in" in para.get_text():
+                        para.decompose()
+                return item.title.text.strip().rstrip("."), str(b)
+    return None
+
+
 def from_url(url: str) -> tuple[str, str]:
     """Return (title, body_html) extracted from a web article."""
     import trafilatura
+    via_feed = from_medium_feed(url)
+    if via_feed:
+        return via_feed
     downloaded = trafilatura.fetch_url(url)
     if not downloaded:
         # Fallback to requests (some sites block trafilatura's fetcher).
