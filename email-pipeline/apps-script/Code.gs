@@ -30,6 +30,10 @@ function install() {
   ).getContentText().replace('__CODE_REF__', CODE_REF);
   putFile_(WORKFLOW_PATH, yml, 'Install reMarkable workflow');
 
+  // Only mail that arrives from now on: never sweep up older messages.
+  const props = PropertiesService.getScriptProperties();
+  if (!props.getProperty('SINCE')) props.setProperty('SINCE', new Date().toISOString());
+
   ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('checkInbox').timeBased().everyMinutes(1).create();
   console.log(`Installed. Mail to ${ADDRESS} now goes to the reMarkable within ~2 minutes.`);
@@ -40,10 +44,16 @@ function install() {
 function checkInbox() {
   const label = GmailApp.getUserLabelByName(QUEUED) || GmailApp.createLabel(QUEUED);
   const query = `to:${ADDRESS} -label:${QUEUED.replace(/\//g, '-')} newer_than:3d`;
+  const since = new Date(PropertiesService.getScriptProperties().getProperty('SINCE') || Date.now());
   GmailApp.search(query, 0, 10).forEach(thread => {
-    const msgs = thread.getMessages();
-    const msg = msgs.filter(m => (m.getTo() + ',' + m.getCc()).toLowerCase().includes(ADDRESS)).pop()
-             || msgs[msgs.length - 1];
+    // Only messages really addressed to remarkable@ (To/Cc/Bcc), sent after
+    // install, and not Google's own account mail.
+    const msg = thread.getMessages().filter(m =>
+      [m.getTo(), m.getCc(), m.getBcc()].join(',').toLowerCase().includes(ADDRESS) &&
+      m.getDate() > since &&
+      !/@(google|accounts\.google)\.com>?$/i.test(m.getFrom())
+    ).pop();
+    if (!msg) { thread.addLabel(label); return; }   // not for us: never look again
     const item = toItem_(msg);
     putFile_(`inbox/${item.id}.json`, JSON.stringify(item),
              'Queue ' + (item.url ? 'link' : item.html ? 'article' : 'PDF'));
