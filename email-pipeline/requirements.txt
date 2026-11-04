@@ -1,0 +1,7 @@
+weasyprint
+trafilatura
+beautifulsoup4
+lxml
+markdown
+requests
+pypdfium2

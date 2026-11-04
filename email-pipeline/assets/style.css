@@ -9,7 +9,7 @@
 }
 
 html, body {
-  font-family: "Iowan Old Style", "Charter", "Georgia", serif;
+  font-family: "Iowan Old Style", "Charter", "Literata", "Georgia", serif;
   font-size: 10pt;
   line-height: 1.5;
   color: #000;
@@ -31,7 +31,7 @@ header .post-date {
 }
 
 article h1, article h2, article h3, article h4 {
-  font-family: "Helvetica Neue", "Arial", sans-serif;
+  font-family: "Helvetica Neue", "Inter", "Arial", sans-serif;
   font-weight: 700;
   page-break-after: avoid;
   line-height: 1.25;
