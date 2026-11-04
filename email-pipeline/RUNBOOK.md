@@ -3,7 +3,8 @@
 Send a link, or forward a newsletter, to **remarkable@marcovanderwerf.nl**.
 Once an hour, a scheduled Claude session turns each new email into an e-ink
 PDF and uploads it to the tablet's **/Articles** folder with `rmapi` (the same
-cloud upload as the Safari extension and the Mac pipelines).
+renderer and upload as the Mac "Send to reMarkable" Shortcut and the Mac
+pipelines).
 
 Needs: full network access and the secret `RMAPI_DEVICE_TOKEN` in the
 cloud environment.
@@ -20,6 +21,8 @@ Gmail labels are used so nothing is sent twice:
    If there are none, stop.
 3. For each thread, `get_thread` to read the newest message, then pick the source:
    - **Body is basically a link** (one URL, maybe with a few words): render the URL.
+     The iOS "Send to reMarkable" Shortcut sends exactly this: subject = page
+     title, body = the URL (see `shortcuts/README.md`).
      `python3 email-pipeline/send.py "<url>" --no-upload --out /tmp/rm/<n>.pdf`
      If the subject isn't empty and isn't just the URL, add `--title "<subject>"`.
    - **Forwarded article or newsletter** (real body text): save the HTML body to

@@ -16,6 +16,8 @@ Usage:
   send.py essay.md --title "My Essay"
   send.py --stdin --title "Pasted note" < note.txt
   send.py article.html --folder "/Articles/FT Tech"
+  send.py saved-page.html --url https://example.com/article
+  send.py --page-json - < page.json        # from the Safari Shortcut
 """
 from __future__ import annotations
 
@@ -57,6 +59,16 @@ def from_url(url: str) -> tuple[str, str]:
         downloaded = r.text if r.ok else None
     if not downloaded:
         sys.exit(f"Could not fetch {url}")
+    return from_page_html(downloaded, url)
+
+
+def from_page_html(downloaded: str, url: str) -> tuple[str, str]:
+    """Return (title, body_html) from a full page's HTML, as loaded from url.
+
+    Used for fetched URLs and for pages captured in the browser (Safari
+    Shortcut), so both produce exactly the same PDF.
+    """
+    import trafilatura
     # Captions: trafilatura drops <figcaption>, so turn each into a marked
     # paragraph right after its image, and restore the caption class after.
     pre = BeautifulSoup(downloaded, "html.parser")
@@ -279,11 +291,23 @@ def main() -> int:
     ap.add_argument("--out", help="Also save the PDF to this local path")
     ap.add_argument("--no-upload", action="store_true",
                     help="Render only; don't upload (for previewing)")
+    ap.add_argument("--url", help="With an .html source: the page's URL. The file "
+                    "is then treated as a full web page, exactly like a fetched URL")
+    ap.add_argument("--page-json", metavar="FILE",
+                    help='Page captured in the browser as JSON {"url": ..., "html": ...}; '
+                    '"-" reads stdin (used by the Safari Shortcut)')
     args = ap.parse_args()
 
     title, body = None, None
 
-    if args.stdin:
+    if args.page_json:
+        import json
+        raw = sys.stdin.read() if args.page_json == "-" else Path(args.page_json).read_text()
+        page = json.loads(raw)
+        if not page.get("html") or not page.get("url"):
+            sys.exit("--page-json needs both \"url\" and \"html\"")
+        title, body = from_page_html(page["html"], page["url"])
+    elif args.stdin:
         text = sys.stdin.read()
         title = args.title or "Note"
         body = from_markdown(text)
@@ -296,6 +320,8 @@ def main() -> int:
         raw = path.read_text()
         if path.suffix == ".md":
             title, body = (args.title or path.stem), from_markdown(raw)
+        elif path.suffix in (".html", ".htm") and args.url:
+            title, body = from_page_html(raw, args.url)
         elif path.suffix in (".html", ".htm"):
             t, body = from_html_file(raw)
             title = args.title or t

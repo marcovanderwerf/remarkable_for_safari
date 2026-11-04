@@ -1,5 +1,15 @@
 # reMarkable for Safari
 
+> **Status: the Safari extension is parked.** Pages now go to the tablet through
+> one renderer (`email-pipeline/send.py`), so they look the same however you
+> send them:
+> - **Mac Safari:** the *Send to reMarkable* Shortcut, see [shortcuts/README.md](shortcuts/README.md)
+> - **Email:** send a link or forward a newsletter to remarkable@marcovanderwerf.nl, see [email-pipeline/RUNBOOK.md](email-pipeline/RUNBOOK.md)
+> - **iPhone / iPad:** a Shortcut that emails the link, see [shortcuts/README.md](shortcuts/README.md)
+>
+> The extension below still works on the current reMarkable cloud API, but it
+> makes its own EPUBs with different styling, so it isn't one of the routes.
+
 A Safari Web Extension that lets you send web articles, news, and other content directly to your reMarkable tablet with one click. Clean, ad-free reading on your e-ink device.
 
 ## Features
@@ -150,6 +160,8 @@ remarkable_for_safari/
 ├── safari-extension/            # Xcode project templates
 │   ├── reMarkable for Safari/   # Host app
 │   └── reMarkable for Safari Extension/  # Safari extension
+├── email-pipeline/              # Renderer (send.py) + email → reMarkable runbook
+├── shortcuts/                   # Mac and iOS "Send to reMarkable" Shortcuts
 ├── scripts/                     # Build and utility scripts
 ├── tests/                       # Mock-cloud test for the sync 1.5 client
 └── README.md
