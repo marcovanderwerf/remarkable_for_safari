@@ -30,6 +30,13 @@ jobs:
           curl -sSfL -o ~/.fonts/Literata-Italic.ttf "$base/Literata-Italic%5Bopsz,wght%5D.ttf" || true
           fc-cache -f >/dev/null
           pip install -q -r code/email-pipeline/requirements.txt
+      # rmapi builds an index of the whole library on first use (~2 min).
+      # Keep it between runs so later uploads take seconds.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/rmapi
+          key: rmapi-${{ github.run_id }}
+          restore-keys: rmapi-
       - name: Log in to reMarkable
         env:
           RMAPI_DEVICE_TOKEN: ${{ secrets.RMAPI_DEVICE_TOKEN }}
