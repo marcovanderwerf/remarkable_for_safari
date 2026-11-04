@@ -23,9 +23,9 @@
     "storage"
   ],
   "host_permissions": [
-    "https://webapp-production-dot-remarkable-production.appspot.com/*",
-    "https://my.remarkable.com/*",
-    "https://document-storage-production-dot-remarkable-production.appspot.com/*"
+    "https://webapp-prod.cloud.remarkable.engineering/*",
+    "https://internal.cloud.remarkable.com/*",
+    "https://my.remarkable.com/*"
   ],
   "background": {
     "service_worker": "background.js",
