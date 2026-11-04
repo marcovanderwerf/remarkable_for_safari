@@ -13,7 +13,14 @@
  * Then choose install() in the toolbar and click Run.
  */
 const ADDRESS = 'remarkable@marcovanderwerf.nl';
-const QUEUED = 'reMarkable/queued';
+// Labels. Pending → sent (archived) or failed (stays in the inbox).
+const L = {
+  pending: 'reMarkable/pending',
+  sent: 'reMarkable/sent',
+  failed: 'reMarkable/failed',
+  skipped: 'reMarkable/skipped',
+  legacy: 'reMarkable/queued',   // from the first version; left alone
+};
 const CODE_REPO = 'marcovanderwerf/remarkable_for_safari';
 const CODE_REF = 'claude/safari-web-clipper-support-CFTtv';
 const WORKFLOW_PATH = '.github/workflows/remarkable.yml';
@@ -40,12 +47,20 @@ function install() {
   checkInbox();
 }
 
-/** Runs every minute. */
+/** Runs every minute: queue new mail, then settle finished mail. */
 function checkInbox() {
-  const label = GmailApp.getUserLabelByName(QUEUED) || GmailApp.createLabel(QUEUED);
-  const query = `to:${ADDRESS} -label:${QUEUED.replace(/\//g, '-')} newer_than:3d`;
+  queueNew_();
+  settleFinished_();
+}
+
+function label_(name) {
+  return GmailApp.getUserLabelByName(name) || GmailApp.createLabel(name);
+}
+
+function queueNew_() {
+  const seen = Object.values(L).map(n => '-label:' + n.replace(/\//g, '-')).join(' ');
   const since = new Date(PropertiesService.getScriptProperties().getProperty('SINCE') || Date.now());
-  GmailApp.search(query, 0, 10).forEach(thread => {
+  GmailApp.search(`to:${ADDRESS} ${seen} newer_than:3d`, 0, 10).forEach(thread => {
     // Only messages really addressed to remarkable@ (To/Cc/Bcc), sent after
     // install, and not Google's own account mail.
     const msg = thread.getMessages().filter(m =>
@@ -53,14 +68,46 @@ function checkInbox() {
       m.getDate() > since &&
       !/@(google|accounts\.google)\.com>?$/i.test(m.getFrom())
     ).pop();
-    if (!msg) { thread.addLabel(label); return; }   // not for us: never look again
+    if (!msg) { thread.addLabel(label_(L.skipped)); return; }   // not for us
     const item = toItem_(msg);
     putFile_(`inbox/${item.id}.json`, JSON.stringify(item),
              'Queue ' + (item.url ? 'link' : item.html ? 'article' : 'PDF'));
-    thread.addLabel(label);
+    thread.addLabel(label_(L.pending));
     thread.markRead();
     console.log('Queued: ' + item.subject);
   });
+}
+
+/** The Action deletes inbox/<id>.json after a successful upload and moves
+ *  it to inbox/failed/ when it can't make a proper PDF. */
+function settleFinished_() {
+  const pending = GmailApp.search(`label:${L.pending.replace(/\//g, '-')}`, 0, 20);
+  if (!pending.length) return;
+  const waiting = listIds_('inbox'), failed = listIds_('inbox/failed');
+  pending.forEach(thread => {
+    const ids = thread.getMessages().map(m => m.getId());
+    if (ids.some(id => waiting.has(id))) return;               // still being processed
+    thread.removeLabel(label_(L.pending));
+    if (ids.some(id => failed.has(id))) {
+      thread.addLabel(label_(L.failed));                       // keep it in view
+      thread.markUnread();
+      console.log('Failed: ' + thread.getFirstMessageSubject());
+    } else {
+      thread.addLabel(label_(L.sent));
+      thread.moveToArchive();
+      console.log('On the reMarkable, archived: ' + thread.getFirstMessageSubject());
+    }
+  });
+}
+
+function listIds_(dir) {
+  const { repo } = settings_();
+  let files;
+  try { files = github_('GET', `/repos/${repo}/contents/${dir}`); }
+  catch (e) { if (/GitHub 404/.test(e.message)) return new Set(); throw e; }
+  return new Set((Array.isArray(files) ? files : [])
+    .filter(f => f.type === 'file' && f.name.endsWith('.json'))
+    .map(f => f.name.slice(0, -5)));
 }
 
 /** What to render: a link, the email itself, and/or attached PDFs. */

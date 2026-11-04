@@ -13,6 +13,15 @@ Gmail ──(Apps Script, every minute)──▶ private GitHub repo: inbox/<id>
                      GitHub Action: send.py renders → rmapi uploads → /Articles
 ```
 
+## In Gmail
+
+| Label | Meaning |
+|---|---|
+| `reMarkable/pending` | Queued, being rendered and uploaded |
+| `reMarkable/sent` | On the tablet: the email is **archived** automatically |
+| `reMarkable/failed` | Couldn't be made into a proper PDF: stays in the inbox, marked unread |
+| `reMarkable/skipped` | Matched the address but wasn't really sent to it (ignored) |
+
 ## What you can send
 
 | You send | You get |
@@ -22,8 +31,9 @@ Gmail ──(Apps Script, every minute)──▶ private GitHub repo: inbox/<id>
 | A PDF attachment | That PDF, unchanged |
 | A Medium link | The full post, read from Medium's RSS feed (Medium blocks page scraping) |
 
-If a page can't be read (a paywall, a bot check, or an empty page), the email is
-set aside in `inbox/failed/` and GitHub emails you that the run failed. Forward
+If a page can't be read (a paywall, a bot check, or an empty page), the email
+stays in your inbox labeled `reMarkable/failed` (the item sits in
+`inbox/failed/`), and GitHub emails you that the run failed. Forward
 the newsletter email itself instead of the link.
 
 ## Setup (once, about 10 minutes)
