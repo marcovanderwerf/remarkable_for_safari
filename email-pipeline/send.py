@@ -314,9 +314,25 @@ def pdf_title(data: bytes, page: dict, url: str) -> str:
     return f"{urlparse(url).netloc.removeprefix('www.')} {dt.date.today():%Y-%m-%d}"
 
 
+def fetch_if_pdf(url: str) -> bytes | None:
+    """If url serves a PDF (papers, reports), return its bytes; else None."""
+    try:
+        r = requests.get(url, headers={"User-Agent": UA}, timeout=60, stream=True)
+    except requests.RequestException:
+        return None
+    with r:
+        if not r.ok:
+            return None
+        ctype = r.headers.get("Content-Type", "").lower()
+        first = next(r.iter_content(1024), b"")
+        if "application/pdf" not in ctype and not first.startswith(b"%PDF"):
+            return None
+        return first + b"".join(r.iter_content(65536))
+
+
 def send_pdf_as_is(page: dict, args) -> int:
     import base64
-    data = base64.b64decode(page["pdf"])
+    data = page["pdf_bytes"] if "pdf_bytes" in page else base64.b64decode(page["pdf"])
     if not data.startswith(b"%PDF"):
         sys.exit("Safari returned something that isn't a PDF "
                  "(a login or 'checking your browser' page?). Open the PDF and try again.")
@@ -371,6 +387,10 @@ def main() -> int:
         title = args.title or "Note"
         body = from_markdown(text)
     elif args.source and args.source.startswith(("http://", "https://")):
+        pdf = fetch_if_pdf(args.source)
+        if pdf:
+            # A link to a PDF: send the file itself, untouched
+            return send_pdf_as_is({"url": args.source, "pdf_bytes": pdf}, args)
         title, body = from_url(args.source)
     elif args.source:
         path = Path(args.source)
@@ -394,6 +414,13 @@ def main() -> int:
 
     body = clean(body)
     body = drop_repeated_title(body, title)
+    from_web = bool(args.page_json or (args.source and args.source.startswith(("http://", "https://"))))
+    words = len(BeautifulSoup(body, "html.parser").get_text(" ", strip=True).split())
+    if from_web and words < 50:
+        # Never upload an empty page (blocked fetch, cookie wall, odd format)
+        sys.exit(f"No article text found ({words} words): not sent. "
+                 "If it's a PDF or paywalled, open it in Safari and use the Mac Shortcut, "
+                 "or attach the PDF to an email.")
     with tempfile.TemporaryDirectory() as td:
         fname = f"{slugify(title)}.pdf"
         out = Path(td) / fname
